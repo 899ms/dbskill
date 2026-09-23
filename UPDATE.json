@@ -1,5 +1,5 @@
 {
-  "version": "2.18.41",
-  "notice": "现在可查询编号隐藏款；有对应编号后，输入编号即可直接执行预制方法",
+  "version": "2.18.42",
+  "notice": "现在可联网读取新编号；以后新增隐藏款无需再次更新 dbskill",
   "details_url": "https://github.com/dontbesilent2025/dbskill/commits/main"
 }

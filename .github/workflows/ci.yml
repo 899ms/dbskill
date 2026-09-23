@@ -33,6 +33,7 @@ jobs:
           python3 tools/check-marketplace-scope.py
           python3 tools/check-skill-metadata.py
           python3 tools/check-numbered-prompts.py .
+          python3 tools/test-numbered-prompts.py
 
       - name: Verify release version and update contract
         run: |

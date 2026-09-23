@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -36,8 +37,9 @@ def validate(root: Path) -> list[str]:
         return [f"编号分配状态无效：{error}"]
 
     numbers: list[int] = []
+    prompt_data: dict[str, tuple[str, str, str]] = {}
     for entry in sorted(prompt_root.iterdir()):
-        if entry.name == "allocation.json":
+        if entry.name in {"allocation.json", "catalog.json"}:
             continue
         if entry.is_symlink() or not entry.is_dir() or NUMBER.fullmatch(entry.name) is None:
             errors.append(f"编号目录只允许三位数字：{entry.name}")
@@ -67,6 +69,13 @@ def validate(root: Path) -> list[str]:
                 end = positions[index + 1] if index + 1 < len(positions) else len(text)
                 if not text[start:end].strip():
                     errors.append(f"{entry.name}/PROMPT.md 的 {section} 没有内容")
+        title_match = re.search(rf"(?m)^# {entry.name}｜(.+)$", text)
+        purpose_match = re.search(r"(?ms)^## 用户要完成的事\s*\n(.*?)(?=^## |\Z)", text)
+        if title_match and purpose_match:
+            purpose_lines = [" ".join(line.split()) for line in purpose_match.group(1).splitlines() if line.strip()]
+            if purpose_lines:
+                digest = hashlib.sha256(prompt.read_bytes()).hexdigest()
+                prompt_data[entry.name] = (title_match.group(1).strip(), purpose_lines[0], digest)
         if re.search(r"(?m)^---\s*$", text[:100]):
             errors.append(f"{entry.name}/PROMPT.md 不使用 Skill frontmatter")
         for nested in entry.rglob("*"):
@@ -75,6 +84,32 @@ def validate(root: Path) -> list[str]:
             if nested.name == "SKILL.md":
                 errors.append(f"{nested.relative_to(prompt_root)} 不得注册为独立 Skill")
 
+    catalog_path = prompt_root / "catalog.json"
+    try:
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        items = catalog["items"]
+        if catalog.get("schema_version") != 1 or not isinstance(items, list):
+            raise ValueError("目录格式错误")
+    except (OSError, json.JSONDecodeError, KeyError, ValueError) as error:
+        errors.append(f"编号目录 catalog.json 无效：{error}")
+        items = []
+    listed_codes: list[str] = []
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+            errors.append("catalog.json 存在格式错误的条目")
+            continue
+        code = item["id"]
+        listed_codes.append(code)
+        expected = prompt_data.get(code)
+        if expected is None:
+            errors.append(f"catalog.json 的编号 {code} 缺少有效 PROMPT.md")
+            continue
+        if (item.get("title"), item.get("purpose"), item.get("sha256")) != expected:
+            errors.append(f"catalog.json 的编号 {code} 与正文标题、用途或 SHA-256 不一致")
+    if listed_codes != sorted(set(listed_codes)):
+        errors.append("catalog.json 的编号必须唯一且升序")
+    if set(listed_codes) != {f"{number:03d}" for number in numbers}:
+        errors.append("catalog.json 与编号目录的编号集合不一致")
     if numbers and max(numbers) >= next_number:
         errors.append("allocation.json 的 next_number 必须大于所有已分配编号")
     return errors
