@@ -1,5 +1,5 @@
 {
-  "version": "2.18.40",
-  "notice": "理论溯源现可独立调用，快速核验命题、理论来源与案例边界",
+  "version": "2.18.41",
+  "notice": "现在可查询编号隐藏款；有对应编号后，输入编号即可直接执行预制方法",
   "details_url": "https://github.com/dontbesilent2025/dbskill/commits/main"
 }
